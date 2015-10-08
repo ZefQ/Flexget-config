@@ -1,0 +1,9 @@
+disable: [seen]
+plugin_priority:
+  set: -254
+  if: -255
+accept_all: yes
+set_series_begin: yes
+only_new: no
+accept_all: yes
+set_series_begin: yes

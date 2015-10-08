@@ -1,0 +1,7 @@
+content_size:
+  max: 16000
+  min: 400
+     
+imdb_lookup: yes
+rottentomatoes_lookup: yes
+proper_movies: yes

@@ -1,0 +1,6 @@
+received/
+*.log
+*.log.*
+#secrets.yml
+.config-lock
+*.sqlite

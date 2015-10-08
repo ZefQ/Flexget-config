@@ -1,0 +1,232 @@
+secrets: secrets.yml
+
+templates:
+  global:
+    deluge:
+      username: '{{ secrets.deluge.usr }}'
+      password: '{{ secrets.deluge.pwd }}'
+      host: '{{ secrets.deluge.host }}'
+      ratio: 2
+      removeatratio: yes
+
+    include: includes/regex_reject.yml
+    verify_ssl_certificates: no
+    torrent_alive: 10
+    magnets: no
+
+  send-xmpp-series-default:  
+    notify_xmpp:
+        sender: '{{ secrets.xmpp.usr }}'
+        password: '{{ secrets.xmpp.pwd }}'
+        recipients: '{{ secrets.xmpp.rcp.default }}'
+        title: 'New episode added:'
+        text: '{{ tvdb_series_name|default(series_name) }} {{ tvdb_ep_id|default(series_id) }}{% if tvdb_ep_name|default(False) %}: {{ tvdb_ep_name }}{% endif %} -- {{ trakt_series_url }}'
+
+  send-xmpp-movies-default:
+    notify_xmpp:
+      sender: '{{ secrets.xmpp.usr }}'
+      password: '{{ secrets.xmpp.pwd }}'
+      recipients: '{{ secrets.xmpp.rcp.default }}'
+      title: 'New movies added:'
+      text: '{{ imdb_name }} ({{ imdb_year }}) -- {{ imdb_url }}'
+
+  series-global:
+    include: includes/series_global.yml
+    trakt_add:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      list: collection
+  
+  movies-global:
+    include: includes/movies_global.yml
+    trakt_remove:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      list: watchlist
+
+    trakt_add:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      list: collection
+
+tasks:
+  Set-Series-Begin-Following:
+    priority: 1
+    template: no_global
+    include: includes/set_series_begin.yml
+    trakt_emit:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      position: next
+      context: collected
+      list: "TV following"
+  
+  Set-Series-Begin-Mickan:
+    priority: 2
+    template: no_global
+    include: includes/set_series_begin.yml
+    trakt_emit:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      position: next
+      context: collected
+      list: "TV Mickan"
+  
+  Set-Series-Begin-Watchlist:
+    priority: 3
+    template: no_global
+    include: includes/set_series_begin.yml
+    trakt_emit:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      position: next
+      context: collected
+      list: watchlist
+
+  # Get series in lists on trakt
+  Series-Following:
+    priority: 20
+    template: send-xmpp-series-default
+    template: series-global
+    include: includes/default_series_path.yml
+    configure_series:
+      from:
+        trakt_list:
+          username: '{{ secrets.trakt.usr }}'
+          password: '{{ secrets.trakt.pwd }}'
+          list: 'TV following'
+          type: shows
+          strip_dates: yes
+      settings:
+        timeframe: 4 hours
+        target: 720p+ hdtv+ h265+
+        propers: 6 hours
+
+  Series-Mickan:
+    priority: 21
+    template: series-global
+    include: includes/default_series_path.yml
+    configure_series:
+      from:
+        trakt_list:
+          username: '{{ secrets.trakt.usr }}'
+          password: '{{ secrets.trakt.pwd }}'
+          list: 'TV Mickan' 
+          type: shows
+          strip_dates: yes
+      settings:
+        timeframe: 4 hours
+        target: 720p+ hdtv+ h265+
+        propers: 6 hours
+  
+  Series-Watchlist:
+    priority: 22
+    template: send-xmpp-series-default
+    template: series-global
+    include: includes/default_series_path.yml
+    configure_series:
+      from:
+        trakt_list:
+          username: '{{ secrets.trakt.usr }}'
+          password: '{{ secrets.trakt.pwd }}'
+          list: watchlist
+          type: shows
+          strip_dates: yes
+      settings:
+        timeframe: 4 hours
+        target: 720p+ hdtv+ h265+
+        propers: 6 hours
+    series_premiere: yes
+    trakt_remove:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      list: watchlist
+  
+  # Import items on imdb watchlist to trakt watchlist
+  Imdb_To_Trakt_import:
+    priority: 49
+    template: no_global
+    imdb_list:
+      list: watchlist
+      user_id: '{{ secrets.imdb.usr }}' 
+    accept_all: yes
+    trakt_lookup: yes
+  
+    trakt_add:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      list: watchlist
+
+  # Get movies from trakt watchlist
+  Watchlist-Movie-Queue:
+    disable: [seen]
+    template: no_global
+    priority: 50
+    trakt_list:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      list: watchlist
+      type: movies
+      strip_dates: yes
+    accept_all: yes
+    seen: local
+    movie_queue: add
+  
+  Movies-Watchlist:
+    priority: 51
+    template: send-xmpp-movies-default
+    template: movies-global
+    include: includes/default_movies_path.yml
+    include: includes/movies_watchlist.yml
+
+  # Clenup trakt lists by removing ended and collected series
+  Remove-Ended-Series-Following:
+    priority: 90
+    template: no_global
+    disable: [seen]
+    trakt_list:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      list: "TV following"
+      type: shows
+    trakt_lookup: yes
+    if:
+      - trakt_in_collection and trakt_series_status == 'Ended': accept
+    trakt_remove:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      list: "TV following"
+
+  Remove-Ended-Series-Mickan:
+    priority: 91
+    template: no_global
+    disable: [seen]
+    trakt_list:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      list: "TV Mickan"
+      type: shows
+    trakt_lookup: yes
+    if:
+      - trakt_in_collection and trakt_series_status == 'Ended': accept
+    trakt_remove:
+      username: '{{ secrets.trakt.usr }}'
+      password: '{{ secrets.trakt.pwd }}'
+      list: "TV Mickan"
+
+schedules:
+  - tasks: [Series-*]
+    interval:
+      hours: 1
+
+  - tasks: [Imdb_To_Trakt_import, Watchlist-Movie-Queue, Movies-Watchlist]
+    interval:
+      hours: 4
+
+  - tasks: [Set-Series-Begin-*]
+    interval:
+      hours: 24
+
+  - tasks: [Remove-Ended-Series-*]
+    interval:
+      days: 7

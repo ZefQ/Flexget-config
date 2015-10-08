@@ -1,0 +1,7 @@
+set:
+  content_filename: >
+    {{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}
+  label: film
+  movedone: "/mnt/media/home_folders/video/movies/new_downloads/{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) [{{ quality }}]"
+  path: /mnt/media/home_folders/download/unfinished
+  queuetotop: false

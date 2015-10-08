@@ -1,0 +1,24 @@
+content_size:
+  min: 12
+  max: 4000
+  strict: no
+
+plugin_priority:
+  trakt_lookup: 112
+metainfo_series: yes
+thetvdb_lookup: yes
+trakt_lookup: yes
+
+discover:
+  what:
+    - emit_series:
+        from_start: yes
+  from:
+    - piratebay:
+        category: highres tv
+        sort_by: leechers
+    - kat:
+        category: tv
+        verified: yes
+    - flexget_archive: yes
+  interval: 30 minutes

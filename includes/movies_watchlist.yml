@@ -1,0 +1,16 @@
+movie_queue: accept
+discover:
+  what:
+    - emit_movie_queue: yes
+  from:
+    - piratebay:
+        category: highres movies
+        sort_by: leechers
+    - kat:
+        category: movies
+        verified: yes
+    - flexget_archive: yes
+  interval: 0 minutes
+quality:
+  - 720p+ webdl+ h264+ dd5.1+
+  - 720p+ bluray
