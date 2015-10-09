@@ -4,3 +4,4 @@ received/
 #secrets.yml
 .config-lock
 *.sqlite
+*.json
