@@ -1,7 +1,7 @@
 received/
 *.log
 *.log.*
-.secrets.yml
+secrets.yml
 .config-lock
 *.sqlite
 *.json
