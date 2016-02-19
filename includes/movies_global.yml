@@ -4,4 +4,6 @@ content_size:
      
 imdb_lookup: yes
 rottentomatoes_lookup: yes
+trakt_lookup: yes
 proper_movies: yes
+require_field: [movie_name, movie_year]

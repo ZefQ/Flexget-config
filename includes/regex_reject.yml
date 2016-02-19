@@ -5,3 +5,11 @@ regexp:
     - \btrailer\b: {from: title} # remove trailer
     - \b(COMPLETE)\b: {from: title}
     - \b(s|d)ub(s|bed)?\b: {from: title} # dont allow dubbed/subbed
+    - \.[sS]\d\d[eE]\d\d\.
+    - \.FiX\.
+    - FASTSUB #French
+    - VOSTFR #French
+    - Subtitulado #Spanish
+    - Special-Wicked 
+    - Magazine 
+    - NLsubs

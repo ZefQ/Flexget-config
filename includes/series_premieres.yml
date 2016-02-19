@@ -1,0 +1,28 @@
+inputs:
+  - rss: 'https://kat.cr/usearch/verified%3A1%20category%3Atv/?rss=1'
+  - rss: 'https://kat.cr/usearch/category%3Atv%20user%3Aettv/?rss=1' # Only ettv
+  - rss: 'https://kat.cr/usearch/category%3Atv%20user%3ATvTeam/?rss=1' # Only TvTeam
+  - rss: 'http://www.torlock.com/television/rss.xml'
+thetvdb_lookup: yes
+require_field: tvdb_genres
+regexp:
+  reject:
+    - animation: {from: tvdb_genres}
+    - children: {from: tvdb_genres}
+    - documentary: {from: tvdb_genres}
+    - food: {from: tvdb_genres}
+    - game show: {from: tvdb_genres}
+    - home and garden: {from: tvdb_genres}
+    - musical: {from: tvdb_genres}
+    - news: {from: tvdb_genres}
+    - reality: {from: tvdb_genres}
+    - soap: {from: tvdb_genres}
+    - special interest: {from: tvdb_genres}
+    - sport: {from: tvdb_genres}
+    - travel: {from: tvdb_genres}
+    - talk show: {from: tvdb_genres}
+series_premiere:
+  timeframe: 1 days
+  allow_seasonless: yes
+  quality: webrip+ <=720p
+  propers: no

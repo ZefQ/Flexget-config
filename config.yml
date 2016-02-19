@@ -1,3 +1,9 @@
+web_server:
+  bind: 0.0.0.0
+  port: 5050
+api: yes
+webui: yes
+
 secrets: secrets.yml
 
 templates:
@@ -7,20 +13,37 @@ templates:
       password: '{{ secrets.deluge.pwd }}'
       host: '{{ secrets.deluge.host }}'
       ratio: 2
-      removeatratio: yes
+      main_file_only: yes
+      keep_subs: no
 
-    include: includes/regex_reject.yml
+    include:
+      - includes/regex_reject.yml
+      - includes/log-filter.yml
     verify_ssl_certificates: no
     torrent_alive: 10
     magnets: no
+    content_filter:
+      require:
+        - '*.avi'
+        - '*.mkv'
+        - '*.mpg'
+        - '*.mp4'
 
   send-xmpp-series-default:  
     notify_xmpp:
-        sender: '{{ secrets.xmpp.usr }}'
-        password: '{{ secrets.xmpp.pwd }}'
-        recipients: '{{ secrets.xmpp.rcp.default }}'
-        title: 'New episode added:'
-        text: '{{ tvdb_series_name|default(series_name) }} {{ tvdb_ep_id|default(series_id) }}{% if tvdb_ep_name|default(False) %}: {{ tvdb_ep_name }}{% endif %} -- {{ trakt_series_url }}'
+      sender: '{{ secrets.xmpp.usr }}'
+      password: '{{ secrets.xmpp.pwd }}'
+      recipients: '{{ secrets.xmpp.rcp.default }}'
+      title: 'New episode added:'
+      text: '{{ tvdb_series_name|default(series_name) }} {{ tvdb_ep_id|default(series_id, True) }}{% if tvdb_ep_name|default(False) %}: {{ tvdb_ep_name }}{% endif %} -- {{ trakt_series_url }}'
+  
+  send-xmpp-series-mickan:  
+    notify_xmpp:
+      sender: '{{ secrets.xmpp.usr }}'
+      password: '{{ secrets.xmpp.pwd }}'
+      recipients: '{{ secrets.xmpp.rcp.mickan }}'
+      title: 'New episode added:'
+      text: '{{ tvdb_series_name|default(series_name) }} {{ tvdb_ep_id|default(series_id) }}{% if tvdb_ep_name|default(False) %}: {{ tvdb_ep_name }}{% endif %} -- {{ trakt_series_url }}'
 
   send-xmpp-movies-default:
     notify_xmpp:
@@ -30,117 +53,222 @@ templates:
       title: 'New movies added:'
       text: '{{ imdb_name }} ({{ imdb_year }}) -- {{ imdb_url }}'
 
-  series-global:
-    include: includes/series_global.yml
+  trakt-add-to-collection:
     trakt_add:
       username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
+      account: '{{ secrets.trakt.account }}'
       list: collection
-  
-  movies-global:
-    include: includes/movies_global.yml
+
+  trakt-remove-from-watchlist:
     trakt_remove:
       username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
+      account: '{{ secrets.trakt.account }}'
       list: watchlist
-
-    trakt_add:
+  
+  conf-set-begin:
+    trakt_emit:
+      account: '{{ secrets.trakt.account }}'
       username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
-      list: collection
+      position: next
+      context: collected
+
+  conf-download-series:
+    set:
+      content_filename: > 
+          {{ series_name|replace('/', '_')|replace(':', ' -') }} - {{ tvdb_ep_id|default(series_id) }}{% if tvdb_ep_name|default(False) %} - {{ tvdb_ep_name|replace('/', '_')|replace(':', ' -') }}{% endif %} - {{ quality }}
+      path: /mnt/media/home_folders/download/unfinished
+      queuetotop: yes
+    configure_series:
+      from:
+        trakt_list:
+          username: '{{ secrets.trakt.usr }}'
+          account: '{{ secrets.trakt.account }}'
+          strip_dates: yes
+          list: 'TV following'
+          type: shows
+      settings:
+        timeframe: 4 hours
+        target: 720p+ hdtv+ h265+
 
 tasks:
   Set-Series-Begin-Following:
     priority: 1
-    template: no_global
+    template: 
+      - no_global
+      - conf-set-begin
     include: includes/set_series_begin.yml
     trakt_emit:
-      username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
-      position: next
-      context: collected
       list: "TV following"
+      account: '{{ secrets.trakt.account }}'
+  
+  Set-Series-Begin-Following-Others:
+    priority: 2
+    template: 
+      - no_global
+      - conf-set-begin
+    include: includes/set_series_begin.yml
+    trakt_emit:
+      list: "TV following others"
+      account: '{{ secrets.trakt.account }}'
   
   Set-Series-Begin-Mickan:
-    priority: 2
-    template: no_global
+    priority: 3
+    template: 
+      - no_global
+      - conf-set-begin
     include: includes/set_series_begin.yml
     trakt_emit:
-      username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
-      position: next
-      context: collected
       list: "TV Mickan"
+      account: '{{ secrets.trakt.account }}'
   
   Set-Series-Begin-Watchlist:
-    priority: 3
-    template: no_global
+    priority: 4
+    template: 
+      - no_global
+      - conf-set-begin
     include: includes/set_series_begin.yml
     trakt_emit:
-      username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
-      position: next
-      context: collected
       list: watchlist
+      account: '{{ secrets.trakt.account }}'
+
+  Set-Series-Begin-liveshows:
+    priority: 5
+    template: 
+      - no_global
+      - conf-set-begin
+    include: includes/set_series_begin.yml
+    trakt_emit:
+      list: "TV Live Shows"
+      account: '{{ secrets.trakt.account }}'
+  
+  Set-Series-Begin-Kempe:
+    priority: 5
+    template: 
+      - no_global
+      - conf-set-begin
+    include: includes/set_series_begin.yml
+    trakt_emit:
+      list: "TV Kempe"
+      account: '{{ secrets.trakt.account }}'
 
   # Get series in lists on trakt
   Series-Following:
     priority: 20
-    template: send-xmpp-series-default
-    template: series-global
-    include: includes/default_series_path.yml
+    template:
+      - send-xmpp-series-default
+      - trakt-add-to-collection
+      - conf-download-series
+    include:
+      - includes/series_global.yml
+    set:
+      movedone: "/mnt/media/home_folders/video/series/following/{{ series_name }}/Season {{ series_season + thetvdb_lookup_season_offset|default(0)}}"
+      label: TV-Following
     configure_series:
       from:
         trakt_list:
-          username: '{{ secrets.trakt.usr }}'
-          password: '{{ secrets.trakt.pwd }}'
-          list: 'TV following'
+          account: '{{ secrets.trakt.account }}'
+          list: 'TV following' 
           type: shows
-          strip_dates: yes
-      settings:
-        timeframe: 4 hours
-        target: 720p+ hdtv+ h265+
-        propers: 6 hours
+  
+#  Series-Following-Others:
+#    priority: 21
+#    include: includes/series_global.yml
+#    template:
+#      - trakt-add-to-collection
+#      - conf-download-series
+#    set:
+#      movedone: "/mnt/media/home_folders/video/series/others/{{ series_name }}/Season {{ series_season + thetvdb_lookup_season_offset|default(0)}}"
+#      label: TV-Others
+#    configure_series:
+#      from:
+#        trakt_list:
+#          account: '{{ secrets.trakt.account }}'
+#          list: 'TV following others'
+#          type: shows
 
   Series-Mickan:
-    priority: 21
-    template: series-global
-    include: includes/default_series_path.yml
+    priority: 22
+    template: 
+      - send-xmpp-series-mickan  
+      - trakt-add-to-collection
+      - conf-download-series
+    include:
+      - includes/series_global.yml
+    set:
+      movedone: "/mnt/media/home_folders/video/series/mickans/{{ series_name }}/Season {{ series_season + thetvdb_lookup_season_offset|default(0)}}"
+      label: TV-Mickan
     configure_series:
       from:
         trakt_list:
-          username: '{{ secrets.trakt.usr }}'
-          password: '{{ secrets.trakt.pwd }}'
+          account: '{{ secrets.trakt.account }}'
           list: 'TV Mickan' 
           type: shows
-          strip_dates: yes
-      settings:
-        timeframe: 4 hours
-        target: 720p+ hdtv+ h265+
-        propers: 6 hours
   
   Series-Watchlist:
-    priority: 22
-    template: send-xmpp-series-default
-    template: series-global
-    include: includes/default_series_path.yml
+    priority: 23
+    template:
+      - send-xmpp-series-default
+      - trakt-add-to-collection
+      - trakt-remove-from-watchlist
+      - conf-download-series
+    include:
+      - includes/series_global.yml
+    set:
+      movedone: "/mnt/media/home_folders/video/series/following/{{ series_name }}/Season {{ series_season + thetvdb_lookup_season_offset|default(0)}}"
+      label: TV-Following
     configure_series:
       from:
         trakt_list:
-          username: '{{ secrets.trakt.usr }}'
-          password: '{{ secrets.trakt.pwd }}'
+          account: '{{ secrets.trakt.account }}'
           list: watchlist
           type: shows
-          strip_dates: yes
-      settings:
-        timeframe: 4 hours
-        target: 720p+ hdtv+ h265+
-        propers: 6 hours
     series_premiere: yes
-    trakt_remove:
-      username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
-      list: watchlist
+  
+  Series-Live-Shows:
+    priority: 24
+    include:
+      - includes/series_global.yml
+    template: 
+      - trakt-add-to-collection
+      - conf-download-series
+    set:
+      movedone: "/mnt/media/home_folders/video/series/live-shows/{{ series_name }}/Season {{ series_season + thetvdb_lookup_season_offset|default(0)}}"
+      label: TV-Live-shows
+    configure_series:
+      from:
+        trakt_list:
+          account: '{{ secrets.trakt.account }}'
+          list: 'TV Live Shows' 
+          type: shows
+  
+  Series-Kempe:
+    priority: 25
+    include:
+      - includes/series_global.yml
+    template: 
+      - trakt-add-to-collection
+      - conf-download-series
+    set:
+      movedone: "/mnt/media/home_folders/video/series/fredriks/{{ series_name }}/Season {{ series_season + thetvdb_lookup_season_offset|default(0)}}"
+      label: TV-Fredde
+    configure_series:
+      from:
+        trakt_list:
+          account: '{{ secrets.trakt.account }}'
+          list: 'TV Kempe' 
+          type: shows
+
+  Series-Premieres:
+    priority: 26
+    include:
+      - includes/series_premieres.yml
+    set:
+      content_filename: > 
+          {{ series_name|replace('/', '_')|replace(':', ' -') }} - {{ tvdb_ep_id|default(series_id, True) }}{% if tvdb_ep_name|default(False) %} - {{ tvdb_ep_name|replace('/', '_')|replace(':', ' -') }}{% endif %} - {{ quality }}
+      movedone: "/mnt/media/home_folders/video/series/premieres/{{ series_name }}/Season {{ series_season + thetvdb_lookup_season_offset|default(0)}}"
+      path: /mnt/media/home_folders/download/unfinished
+      queuetotop: yes
+      label: TV-Premieres
   
   # Import items on imdb watchlist to trakt watchlist
   Imdb_To_Trakt_import:
@@ -154,7 +282,7 @@ tasks:
   
     trakt_add:
       username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
+      account: '{{ secrets.trakt.account }}'
       list: watchlist
 
   # Get movies from trakt watchlist
@@ -164,7 +292,7 @@ tasks:
     priority: 50
     trakt_list:
       username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
+      account: '{{ secrets.trakt.account }}'
       list: watchlist
       type: movies
       strip_dates: yes
@@ -174,10 +302,38 @@ tasks:
   
   Movies-Watchlist:
     priority: 51
-    template: send-xmpp-movies-default
-    template: movies-global
-    include: includes/default_movies_path.yml
-    include: includes/movies_watchlist.yml
+    template:
+      - send-xmpp-movies-default
+      - trakt-add-to-collection
+      - trakt-remove-from-watchlist
+    include:
+      - includes/movies_global.yml
+    set:
+      content_filename: >
+        {{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}
+      label: film
+      movedone: "/mnt/media/home_folders/video/movies/new_downloads/{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) [{{ quality }}]"
+      path: /mnt/media/home_folders/download/unfinished
+      queuetotop: false
+
+    movie_queue: accept
+    imdb_required: yes
+    discover:
+      what:
+        - emit_movie_queue: yes
+      from:
+        - piratebay:
+            category: highres movies
+            sort_by: leechers
+        - kat:
+            category: movies
+            verified: yes
+        - torrentz: verified
+        - flexget_archive: yes
+    interval: 0 minutes
+    quality:
+      - 720p+ webdl+ h265+ dd5.1+
+      - 720p+ bluray
 
   # Clenup trakt lists by removing ended and collected series
   Remove-Ended-Series-Following:
@@ -186,7 +342,7 @@ tasks:
     disable: [seen]
     trakt_list:
       username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
+      account: '{{ secrets.trakt.account }}'
       list: "TV following"
       type: shows
     trakt_lookup: yes
@@ -194,7 +350,7 @@ tasks:
       - trakt_in_collection and trakt_series_status == 'Ended': accept
     trakt_remove:
       username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
+      account: '{{ secrets.trakt.account }}'
       list: "TV following"
 
   Remove-Ended-Series-Mickan:
@@ -203,7 +359,7 @@ tasks:
     disable: [seen]
     trakt_list:
       username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
+      account: '{{ secrets.trakt.account }}'
       list: "TV Mickan"
       type: shows
     trakt_lookup: yes
@@ -211,7 +367,7 @@ tasks:
       - trakt_in_collection and trakt_series_status == 'Ended': accept
     trakt_remove:
       username: '{{ secrets.trakt.usr }}'
-      password: '{{ secrets.trakt.pwd }}'
+      account: '{{ secrets.trakt.account }}'
       list: "TV Mickan"
 
 schedules:

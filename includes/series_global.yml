@@ -8,6 +8,7 @@ plugin_priority:
 metainfo_series: yes
 thetvdb_lookup: yes
 trakt_lookup: yes
+require_field: [series_name, series_id]
 
 discover:
   what:
@@ -20,5 +21,10 @@ discover:
     - kat:
         category: tv
         verified: yes
+    - rarbg:
+        category: [18, 41]
+        limit: 100
+        use_tvdb: True
+    - search_rss: http://torrentz.eu/feed?q={{search_term}}
     - flexget_archive: yes
   interval: 30 minutes
