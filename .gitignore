@@ -5,3 +5,4 @@ secrets.yml
 .config-lock
 *.sqlite
 *.json
+.webassets-cache

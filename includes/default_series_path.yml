@@ -1,7 +1,0 @@
-set:
-  content_filename: >
-    {{ series_name|replace('/', '_')|replace(':', ' -') }} - {{ tvdb_ep_id|default(series_id) }}{% if tvdb_ep_name|default(False) %} - {{ tvdb_ep_name|replace('/', '_')|replace(':', ' -') }}{% endif %} - {{ quality }}
-  movedone: "/mnt/media/home_folders/video/series/following/{{ series_name }}/Season {{ series_season + thetvdb_lookup_season_offset|default(0)}}"
-  path: /mnt/media/home_folders/download/unfinished
-  queuetotop: yes
-
